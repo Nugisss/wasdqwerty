@@ -4,65 +4,242 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Dashboard | Monitoring IoT</title>
-  <link rel="stylesheet" href="css/style.css" />
-  <link rel="stylesheet" href="css/dashboard.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --primary:     #4f46e5;
+      --primary-dark:#4338ca;
+      --danger:      #ef4444;
+      --success:     #22c55e;
+      --text:        #1e293b;
+      --text-soft:   #64748b;
+      --border:      #e2e8f0;
+      --muted:       #94a3b8;
+      --gradient:    linear-gradient(135deg, #7c3aed 0%, #06b6d4 100%);
+      --shadow-sm:   0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.04);
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: var(--text); background: #f5f6fa; }
+    a { text-decoration: none; }
+
+    /* ===== DOT ===== */
+    .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+    .dot.online { background: #22c55e; box-shadow: 0 0 0 3px rgba(34,197,94,.2); }
+    .dot.warn   { background: #f59e0b; }
+    .dot.off    { background: #ef4444; }
+
+    /* ===== APP SHELL ===== */
+    .app-shell { display: grid; grid-template-columns: 260px 1fr; min-height: 100vh; }
+
+    /* ===== SIDEBAR ===== */
+    .sidebar { background: #0b1020; color: #cbd5e1; padding: 28px 18px; position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; overflow-y: auto; }
+    .sidebar-brand { display: flex; align-items: center; gap: 10px; font-weight: 700; color: #fff; font-size: 17px; padding: 0 8px 24px; border-bottom: 1px solid rgba(255,255,255,.08); margin-bottom: 20px; }
+    .sidebar-brand img { width: 28px; height: 28px; object-fit: contain; }
+    .sidebar-brand strong { background: var(--gradient); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    .sidebar-nav { display: grid; gap: 4px; }
+    .nav-label { font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #334155; padding: 16px 14px 6px; }
+    .sidebar-nav a { padding: 11px 14px; border-radius: 10px; font-size: 14px; font-weight: 500; color: #94a3b8; transition: background .15s ease, color .15s ease; display: flex; align-items: center; gap: 10px; cursor: pointer; }
+    .sidebar-nav a:hover { background: rgba(255,255,255,.05); color: #fff; }
+    .sidebar-nav a.active { background: var(--gradient); color: #fff; box-shadow: 0 8px 20px rgba(79,70,229,.4); }
+    .sidebar-nav .logout { margin-top: 20px; color: #f87171; }
+    .sidebar-nav .logout:hover { background: rgba(248,113,113,.08); color: #f87171; }
+
+    /* ===== MAIN ===== */
+    .main { padding: 32px 36px; min-width: 0; }
+
+    /* ===== TOPBAR ===== */
+    .topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 28px; }
+    .topbar h1 { font-size: 26px; font-weight: 800; letter-spacing: -.01em; }
+    .muted { color: var(--text-soft); font-size: 14px; margin-top: 3px; }
+    .topbar-actions { display: flex; align-items: center; gap: 14px; }
+    .status-pill { display: inline-flex; align-items: center; gap: 8px; background: #fff; border: 1px solid var(--border); padding: 8px 14px; border-radius: 999px; font-size: 13px; font-weight: 600; }
+    .avatar { width: 40px; height: 40px; border-radius: 50%; background: var(--gradient); color: #fff; display: grid; place-items: center; font-weight: 700; font-size: 15px; cursor: pointer; }
+
+    /* ===== PAGE ===== */
+    .page { display: none; }
+    .page.active { display: block; }
+
+    /* ===== PANEL ===== */
+    .panel { background: #fff; border: 1px solid var(--border); border-radius: 16px; padding: 22px; box-shadow: var(--shadow-sm); margin-bottom: 18px; }
+    .panel:last-child { margin-bottom: 0; }
+    .panel-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; flex-wrap: wrap; gap: 10px; }
+    .panel-header h3 { font-size: 16px; font-weight: 700; }
+    .panel-header select { padding: 6px 12px; border-radius: 8px; border: 1px solid var(--border); font-size: 13px; background: #fff; font-family: inherit; color: var(--text); outline: none; cursor: pointer; }
+
+    /* ===== TABLE ===== */
+    .table-wrap { overflow-x: auto; }
+    .data-table { width: 100%; border-collapse: collapse; }
+    .data-table th, .data-table td { text-align: left; padding: 12px 14px; font-size: 14px; border-bottom: 1px solid var(--border); }
+    .data-table th { color: var(--text-soft); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .4px; background: #f9fafb; }
+    .data-table tbody tr:hover { background: #f9fafb; }
+    .badge-pill { display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+    .badge-pill.ok   { background: rgba(16,185,129,.12); color: #047857; }
+    .badge-pill.warn { background: rgba(245,158,11,.15);  color: #b45309; }
+    .badge-pill.err  { background: rgba(239,68,68,.12);   color: #b91c1c; }
+
+    /* ===== DASHBOARD PAGE ===== */
+    .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; margin-bottom: 24px; }
+    .stat-card { padding: 22px; border-radius: 16px; color: #fff; position: relative; overflow: hidden; box-shadow: 0 12px 28px rgba(15,23,42,.12); transition: transform .2s, box-shadow .2s; cursor: default; }
+    .stat-card:hover { transform: translateY(-3px); box-shadow: 0 18px 36px rgba(15,23,42,.18); }
+    .stat-card::after { content: ''; position: absolute; top: -30px; right: -30px; width: 100px; height: 100px; border-radius: 50%; background: rgba(255,255,255,.08); }
+    .stat-card small { opacity: .85; font-size: 12px; font-weight: 600; letter-spacing: .4px; text-transform: uppercase; }
+    .stat-card h2 { font-size: 30px; font-weight: 800; margin: 8px 0 6px; }
+    .stat-card .trend { font-size: 12px; opacity: .9; }
+    .gradient-1 { background: linear-gradient(135deg, #4f46e5, #7c3aed); }
+    .gradient-2 { background: linear-gradient(135deg, #06b6d4, #3b82f6); }
+    .gradient-3 { background: linear-gradient(135deg, #f59e0b, #ef4444); }
+    .gradient-4 { background: linear-gradient(135deg, #10b981, #059669); }
+    .dashboard-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 18px; margin-bottom: 24px; align-items: start; }
+    .activity-list { list-style: none; display: grid; gap: 14px; }
+    .activity-list li { display: flex; align-items: center; gap: 12px; font-size: 14px; color: var(--text); padding-bottom: 14px; border-bottom: 1px solid var(--border); }
+    .activity-list li:last-child { border-bottom: none; padding-bottom: 0; }
+    .activity-list small { margin-left: auto; color: var(--muted); font-size: 12px; white-space: nowrap; }
+
+    /* ===== SENSOR PAGE ===== */
+    .sensor-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-bottom: 24px; }
+    .sensor-card { background: #fff; border: 1px solid var(--border); border-radius: 16px; padding: 22px; box-shadow: var(--shadow-sm); transition: transform .2s, box-shadow .2s; }
+    .sensor-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(15,23,42,.1); }
+    .sensor-card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+    .sensor-name { font-size: 14px; font-weight: 700; }
+    .sensor-icon { width: 40px; height: 40px; border-radius: 10px; display: grid; place-items: center; font-size: 18px; }
+    .icon-1 { background: rgba(79,70,229,.1); }
+    .icon-2 { background: rgba(6,182,212,.1); }
+    .icon-3 { background: rgba(245,158,11,.1); }
+    .icon-4 { background: rgba(16,185,129,.1); }
+    .icon-5 { background: rgba(239,68,68,.1); }
+    .icon-6 { background: rgba(124,58,237,.1); }
+    .sensor-value { font-size: 28px; font-weight: 800; margin-bottom: 4px; }
+    .sensor-unit { font-size: 13px; color: var(--text-soft); }
+    .sensor-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); }
+    .sensor-status { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; }
+    .sensor-updated { font-size: 12px; color: var(--muted); }
+
+    /* ===== RIWAYAT PAGE ===== */
+    .filter-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .filter-bar select, .filter-bar input[type="date"] { padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border); font-size: 13px; background: #fff; font-family: inherit; color: var(--text); outline: none; cursor: pointer; }
+    .btn-filter { padding: 8px 16px; border-radius: 8px; border: none; background: var(--primary); color: #fff; font-size: 13px; font-weight: 600; font-family: inherit; cursor: pointer; transition: background .15s; }
+    .btn-filter:hover { background: var(--primary-dark); }
+    .chart-tabs { display: flex; gap: 6px; margin-bottom: 18px; }
+    .chart-tab { padding: 6px 14px; border-radius: 8px; border: 1px solid var(--border); font-size: 13px; font-weight: 600; cursor: pointer; background: #fff; color: var(--text-soft); transition: all .15s; }
+    .chart-tab.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+
+    /* ===== PENGATURAN PAGE ===== */
+    .settings-grid { display: grid; grid-template-columns: 220px 1fr; gap: 24px; align-items: start; }
+    .settings-tabs { background: #fff; border: 1px solid var(--border); border-radius: 16px; padding: 10px; box-shadow: var(--shadow-sm); }
+    .settings-tab { display: flex; align-items: center; gap: 10px; padding: 11px 14px; border-radius: 10px; font-size: 14px; font-weight: 500; color: var(--text-soft); cursor: pointer; transition: all .15s; border: none; background: none; width: 100%; text-align: left; }
+    .settings-tab:hover { background: #f9fafb; color: var(--text); }
+    .settings-tab.active { background: rgba(79,70,229,.08); color: var(--primary); font-weight: 600; }
+    .settings-panel { background: #fff; border: 1px solid var(--border); border-radius: 16px; padding: 28px; box-shadow: var(--shadow-sm); margin-bottom: 18px; }
+    .settings-panel:last-child { margin-bottom: 0; }
+    .settings-panel-title { font-size: 16px; font-weight: 700; margin-bottom: 6px; }
+    .settings-panel-desc { font-size: 13px; color: var(--text-soft); margin-bottom: 22px; padding-bottom: 18px; border-bottom: 1px solid var(--border); }
+    .form-group { margin-bottom: 18px; }
+    .form-group label { display: block; font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 7px; }
+    .form-group input[type="text"],
+    .form-group input[type="email"],
+    .form-group input[type="password"],
+    .form-group select,
+    .form-group textarea { width: 100%; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--border); font-size: 14px; font-family: inherit; color: var(--text); background: #fafbfd; outline: none; transition: border .15s, box-shadow .15s; }
+    .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: var(--primary); box-shadow: 0 0 0 4px rgba(79,70,229,.12); background: #fff; }
+    .form-group textarea { resize: vertical; min-height: 90px; }
+    .form-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 14px 0; border-bottom: 1px solid var(--border); }
+    .toggle-row:last-child { border-bottom: none; }
+    .toggle-label { font-size: 14px; font-weight: 500; }
+    .toggle-hint { font-size: 12px; color: var(--muted); margin-top: 2px; }
+    .toggle { position: relative; width: 44px; height: 24px; flex-shrink: 0; }
+    .toggle input { opacity: 0; width: 0; height: 0; }
+    .toggle-slider { position: absolute; inset: 0; background: #e2e8f0; border-radius: 999px; cursor: pointer; transition: background .2s; }
+    .toggle-slider::before { content: ''; position: absolute; width: 18px; height: 18px; border-radius: 50%; background: #fff; top: 3px; left: 3px; transition: transform .2s; box-shadow: 0 1px 3px rgba(0,0,0,.2); }
+    .toggle input:checked + .toggle-slider { background: var(--primary); }
+    .toggle input:checked + .toggle-slider::before { transform: translateX(20px); }
+    .btn-row { display: flex; gap: 10px; margin-top: 22px; }
+    .btn { padding: 10px 20px; border-radius: 10px; border: none; font-size: 14px; font-weight: 600; font-family: inherit; cursor: pointer; transition: all .15s; }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:hover { background: var(--primary-dark); }
+    .btn-secondary { background: #fff; color: var(--text); border: 1px solid var(--border); }
+    .btn-secondary:hover { background: #f9fafb; }
+    .btn-danger { background: rgba(239,68,68,.08); color: var(--danger); border: 1px solid rgba(239,68,68,.2); }
+    .btn-danger:hover { background: rgba(239,68,68,.15); }
+
+    /* ===== RESPONSIVE ===== */
+    @media (max-width: 980px) {
+      .app-shell { grid-template-columns: 1fr; }
+      .sidebar { position: relative; height: auto; }
+      .stats-grid { grid-template-columns: repeat(2, 1fr); }
+      .dashboard-grid { grid-template-columns: 1fr; }
+      .sensor-grid { grid-template-columns: repeat(2, 1fr); }
+      .settings-grid { grid-template-columns: 1fr; }
+      .main { padding: 24px 18px; }
+      .form-row-2 { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 600px) {
+      .stats-grid { grid-template-columns: 1fr 1fr; }
+      .sensor-grid { grid-template-columns: 1fr; }
+    }
+  </style>
 </head>
 <body>
-  <div class="app-shell">
-    <!-- Sidebar -->
-    <aside class="sidebar">
-      <div class="sidebar-brand">
-        <img src="img/logo.png" alt="Logo" />
-        <span>Monitoring<strong>IoT</strong></span>
+<div class="app-shell">
+
+  <!-- ===== SIDEBAR ===== -->
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <img src="img/logo.png" alt="Logo" />
+      <span>Monitoring<strong>IoT</strong></span>
+    </div>
+    <nav class="sidebar-nav">
+      <p class="nav-label">Menu Utama</p>
+      <a data-page="dashboard" class="active">📊 Dashboard</a>
+      <a data-page="sensor">🌡 Sensor</a>
+      <a data-page="riwayat">📈 Riwayat</a>
+      <a data-page="pengaturan">⚙ Pengaturan</a>
+      <a href="login.html" class="logout">↩ Keluar</a>
+    </nav>
+  </aside>
+
+  <!-- ===== MAIN ===== -->
+  <main class="main">
+
+    <!-- Topbar -->
+    <header class="topbar">
+      <div>
+        <h1 id="pageTitle">Dashboard Monitoring</h1>
+        <p class="muted" id="pageSubtitle">Selamat datang kembali, pantau perangkat Anda di sini.</p>
       </div>
-      <nav class="sidebar-nav">
-        <a href="dashboard.html" class="active">📊 Dashboard</a>
-        <a href="#">🌡 Sensor</a>
-        <a href="#">📈 Riwayat</a>
-        <a href="#">⚙ Pengaturan</a>
-        <a href="#" id="logoutBtn" class="logout">↩ Keluar</a>
-      </nav>
-    </aside>
+      <div class="topbar-actions">
+        <div class="status-pill"><span class="dot online"></span> Terhubung</div>
+        <div class="avatar">U</div>
+      </div>
+    </header>
 
-    <!-- Main -->
-    <main class="main">
-      <header class="topbar">
-        <div>
-          <h1>Dashboard Monitoring</h1>
-          <p class="muted">Selamat datang kembali, pantau perangkat Anda di sini.</p>
-        </div>
-        <div class="topbar-actions">
-          <div class="status-pill"><span class="dot online"></span> Terhubung</div>
-          <div class="avatar">U</div>
-        </div>
-      </header>
-
-      <!-- Stats -->
+    <!-- ======================== -->
+    <!-- PAGE: DASHBOARD          -->
+    <!-- ======================== -->
+    <div class="page active" id="page-dashboard">
       <section class="stats-grid">
         <div class="stat-card gradient-1">
           <small>Suhu</small>
           <h2 id="statSuhu">--°C</h2>
-          <span class="trend up">↑ Stabil</span>
+          <span class="trend">↑ Stabil</span>
         </div>
         <div class="stat-card gradient-2">
           <small>Kelembapan</small>
           <h2 id="statKelembapan">--%</h2>
-          <span class="trend up">↑ Normal</span>
+          <span class="trend">↑ Normal</span>
         </div>
         <div class="stat-card gradient-3">
           <small>Tekanan</small>
           <h2 id="statTekanan">-- hPa</h2>
-          <span class="trend down">↓ Turun tipis</span>
+          <span class="trend">↓ Turun tipis</span>
         </div>
         <div class="stat-card gradient-4">
           <small>Cahaya</small>
           <h2 id="statCahaya">-- lx</h2>
-          <span class="trend up">↑ Cerah</span>
+          <span class="trend">↑ Cerah</span>
         </div>
       </section>
 
-      <!-- Chart + Table -->
       <section class="dashboard-grid">
         <div class="panel">
           <div class="panel-header">
@@ -75,12 +252,9 @@
           </div>
           <canvas id="sensorChart" height="120"></canvas>
         </div>
-
         <div class="panel">
-          <div class="panel-header">
-            <h3>Aktivitas Terbaru</h3>
-          </div>
-          <ul class="activity-list" id="activityList">
+          <div class="panel-header"><h3>Aktivitas Terbaru</h3></div>
+          <ul class="activity-list">
             <li><span class="dot online"></span> Sensor A terhubung <small>2 mnt lalu</small></li>
             <li><span class="dot warn"></span> Suhu naik di Ruang 1 <small>10 mnt lalu</small></li>
             <li><span class="dot online"></span> Sinkronisasi data berhasil <small>15 mnt lalu</small></li>
@@ -90,22 +264,281 @@
       </section>
 
       <section class="panel">
-        <div class="panel-header">
-          <h3>Data Sensor</h3>
-        </div>
+        <div class="panel-header"><h3>Data Sensor</h3></div>
         <div class="table-wrap">
           <table class="data-table">
-            <thead>
-              <tr><th>Waktu</th><th>Sensor</th><th>Nilai</th><th>Status</th></tr>
-            </thead>
+            <thead><tr><th>Waktu</th><th>Sensor</th><th>Nilai</th><th>Status</th></tr></thead>
             <tbody id="dataTable"></tbody>
           </table>
         </div>
       </section>
-    </main>
-  </div>
+    </div>
 
-  <script type="module" src="js/dashboard.js"></script>
-  <script src="js/chart.js"></script>
+    <!-- ======================== -->
+    <!-- PAGE: SENSOR             -->
+    <!-- ======================== -->
+    <div class="page" id="page-sensor">
+      <div class="sensor-grid">
+        <div class="sensor-card">
+          <div class="sensor-card-header"><span class="sensor-name">Suhu</span><div class="sensor-icon icon-1">🌡</div></div>
+          <div class="sensor-value">--</div>
+          <div class="sensor-unit">Derajat Celsius (°C)</div>
+          <div class="sensor-footer">
+            <span class="sensor-status"><span class="dot online"></span> Online</span>
+            <span class="sensor-updated">Baru saja</span>
+          </div>
+        </div>
+        <div class="sensor-card">
+          <div class="sensor-card-header"><span class="sensor-name">Kelembapan</span><div class="sensor-icon icon-2">💧</div></div>
+          <div class="sensor-value">--</div>
+          <div class="sensor-unit">Persen (%)</div>
+          <div class="sensor-footer">
+            <span class="sensor-status"><span class="dot online"></span> Online</span>
+            <span class="sensor-updated">Baru saja</span>
+          </div>
+        </div>
+        <div class="sensor-card">
+          <div class="sensor-card-header"><span class="sensor-name">Tekanan</span><div class="sensor-icon icon-3">🌬</div></div>
+          <div class="sensor-value">--</div>
+          <div class="sensor-unit">Hectopascal (hPa)</div>
+          <div class="sensor-footer">
+            <span class="sensor-status"><span class="dot online"></span> Online</span>
+            <span class="sensor-updated">Baru saja</span>
+          </div>
+        </div>
+        <div class="sensor-card">
+          <div class="sensor-card-header"><span class="sensor-name">Cahaya</span><div class="sensor-icon icon-4">☀️</div></div>
+          <div class="sensor-value">--</div>
+          <div class="sensor-unit">Lux (lx)</div>
+          <div class="sensor-footer">
+            <span class="sensor-status"><span class="dot online"></span> Online</span>
+            <span class="sensor-updated">Baru saja</span>
+          </div>
+        </div>
+        <div class="sensor-card">
+          <div class="sensor-card-header"><span class="sensor-name">Sensor B</span><div class="sensor-icon icon-5">📡</div></div>
+          <div class="sensor-value">--</div>
+          <div class="sensor-unit">Tidak ada data</div>
+          <div class="sensor-footer">
+            <span class="sensor-status"><span class="dot off"></span> Offline</span>
+            <span class="sensor-updated">1 jam lalu</span>
+          </div>
+        </div>
+        <div class="sensor-card">
+          <div class="sensor-card-header"><span class="sensor-name">Sensor C</span><div class="sensor-icon icon-6">🔌</div></div>
+          <div class="sensor-value">--</div>
+          <div class="sensor-unit">Menunggu data</div>
+          <div class="sensor-footer">
+            <span class="sensor-status"><span class="dot warn"></span> Peringatan</span>
+            <span class="sensor-updated">10 mnt lalu</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header"><h3>Detail Sensor</h3></div>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead><tr><th>Sensor</th><th>Tipe</th><th>Nilai</th><th>Lokasi</th><th>Status</th></tr></thead>
+            <tbody>
+              <tr><td>Sensor A</td><td>Suhu & Kelembapan</td><td>--°C / --%</td><td>Ruang 1</td><td><span class="badge-pill ok">Online</span></td></tr>
+              <tr><td>Sensor B</td><td>Tekanan</td><td>-- hPa</td><td>Ruang 2</td><td><span class="badge-pill err">Offline</span></td></tr>
+              <tr><td>Sensor C</td><td>Cahaya</td><td>-- lx</td><td>Ruang 3</td><td><span class="badge-pill warn">Peringatan</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======================== -->
+    <!-- PAGE: RIWAYAT            -->
+    <!-- ======================== -->
+    <div class="page" id="page-riwayat">
+      <div class="panel">
+        <div class="panel-header">
+          <h3>Grafik Historis</h3>
+          <div class="filter-bar">
+            <select>
+              <option>Semua Sensor</option>
+              <option>Suhu</option>
+              <option>Kelembapan</option>
+              <option>Tekanan</option>
+              <option>Cahaya</option>
+            </select>
+            <input type="date" />
+            <input type="date" />
+            <button class="btn-filter">Terapkan</button>
+          </div>
+        </div>
+        <div class="chart-tabs">
+          <button class="chart-tab active">24 Jam</button>
+          <button class="chart-tab">7 Hari</button>
+          <button class="chart-tab">30 Hari</button>
+        </div>
+        <canvas id="riwayatChart" height="100"></canvas>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header"><h3>Log Data</h3></div>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead><tr><th>Waktu</th><th>Sensor</th><th>Nilai</th><th>Status</th></tr></thead>
+            <tbody>
+              <tr><td>10:00</td><td>Suhu</td><td>28°C</td><td><span class="badge-pill ok">Normal</span></td></tr>
+              <tr><td>10:05</td><td>Kelembapan</td><td>65%</td><td><span class="badge-pill ok">Normal</span></td></tr>
+              <tr><td>10:10</td><td>Tekanan</td><td>1013 hPa</td><td><span class="badge-pill warn">Peringatan</span></td></tr>
+              <tr><td>10:15</td><td>Cahaya</td><td>450 lx</td><td><span class="badge-pill ok">Normal</span></td></tr>
+              <tr><td>10:20</td><td>Sensor B</td><td>--</td><td><span class="badge-pill err">Offline</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======================== -->
+    <!-- PAGE: PENGATURAN         -->
+    <!-- ======================== -->
+    <div class="page" id="page-pengaturan">
+      <div class="settings-grid">
+        <div class="settings-tabs">
+          <button class="settings-tab active">👤 Profil</button>
+          <button class="settings-tab">🔔 Notifikasi</button>
+          <button class="settings-tab">🔒 Keamanan</button>
+          <button class="settings-tab">📡 Perangkat</button>
+        </div>
+        <div>
+          <div class="settings-panel">
+            <div class="settings-panel-title">Profil Pengguna</div>
+            <div class="settings-panel-desc">Perbarui informasi profil dan alamat email Anda.</div>
+            <div class="form-row-2">
+              <div class="form-group"><label>Nama Depan</label><input type="text" placeholder="Nama depan" /></div>
+              <div class="form-group"><label>Nama Belakang</label><input type="text" placeholder="Nama belakang" /></div>
+            </div>
+            <div class="form-group"><label>Email</label><input type="email" placeholder="nama@email.com" /></div>
+            <div class="form-group"><label>Tentang</label><textarea placeholder="Tulis deskripsi singkat..."></textarea></div>
+            <div class="btn-row">
+              <button class="btn btn-primary">Simpan</button>
+              <button class="btn btn-secondary">Batal</button>
+            </div>
+          </div>
+
+          <div class="settings-panel">
+            <div class="settings-panel-title">Notifikasi</div>
+            <div class="settings-panel-desc">Atur kapan dan bagaimana Anda menerima notifikasi.</div>
+            <div class="toggle-row">
+              <div><div class="toggle-label">Notifikasi Email</div><div class="toggle-hint">Terima ringkasan harian via email</div></div>
+              <label class="toggle"><input type="checkbox" checked /><span class="toggle-slider"></span></label>
+            </div>
+            <div class="toggle-row">
+              <div><div class="toggle-label">Peringatan Sensor</div><div class="toggle-hint">Notifikasi saat sensor offline atau anomali</div></div>
+              <label class="toggle"><input type="checkbox" checked /><span class="toggle-slider"></span></label>
+            </div>
+            <div class="toggle-row">
+              <div><div class="toggle-label">Laporan Mingguan</div><div class="toggle-hint">Laporan otomatis setiap Senin pagi</div></div>
+              <label class="toggle"><input type="checkbox" /><span class="toggle-slider"></span></label>
+            </div>
+          </div>
+
+          <div class="settings-panel">
+            <div class="settings-panel-title">Keamanan</div>
+            <div class="settings-panel-desc">Perbarui password untuk menjaga keamanan akun.</div>
+            <div class="form-group"><label>Password Saat Ini</label><input type="password" placeholder="••••••••" /></div>
+            <div class="form-row-2">
+              <div class="form-group"><label>Password Baru</label><input type="password" placeholder="••••••••" /></div>
+              <div class="form-group"><label>Konfirmasi Password</label><input type="password" placeholder="••••••••" /></div>
+            </div>
+            <div class="btn-row">
+              <button class="btn btn-primary">Ubah Password</button>
+              <button class="btn btn-danger">Hapus Akun</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script type="module" src="js/dashboard.js"></script>
+
+<script>
+  // ===== NAVIGASI SIDEBAR =====
+  const pages = {
+    dashboard: { title: 'Dashboard Monitoring', sub: 'Selamat datang kembali, pantau perangkat Anda di sini.' },
+    sensor:    { title: 'Sensor',               sub: 'Pantau status semua sensor yang terhubung.' },
+    riwayat:   { title: 'Riwayat',              sub: 'Lihat data historis sensor Anda.' },
+    pengaturan:{ title: 'Pengaturan',            sub: 'Kelola akun dan konfigurasi sistem Anda.' },
+  };
+
+  function navigate(pageId) {
+    // Sembunyikan semua halaman
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.sidebar-nav a[data-page]').forEach(a => a.classList.remove('active'));
+
+    // Tampilkan halaman yang dipilih
+    document.getElementById('page-' + pageId).classList.add('active');
+    document.querySelector(`.sidebar-nav a[data-page="${pageId}"]`).classList.add('active');
+
+    // Update judul
+    document.getElementById('pageTitle').textContent = pages[pageId].title;
+    document.getElementById('pageSubtitle').textContent = pages[pageId].sub;
+
+    // Init chart riwayat saat pertama dibuka
+    if (pageId === 'riwayat' && !window.riwayatChartInit) {
+      window.riwayatChartInit = true;
+      const ctx = document.getElementById('riwayatChart').getContext('2d');
+      new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: ['00:00','02:00','04:00','06:00','08:00','10:00','12:00','14:00','16:00','18:00','20:00','22:00'],
+          datasets: [
+            { label: 'Suhu (°C)', data: [25,24,24,26,28,29,30,31,30,28,27,26], borderColor: '#4f46e5', backgroundColor: 'rgba(79,70,229,.08)', tension: 0.4, fill: true },
+            { label: 'Kelembapan (%)', data: [60,62,65,63,58,55,52,50,53,58,62,64], borderColor: '#06b6d4', backgroundColor: 'rgba(6,182,212,.08)', tension: 0.4, fill: true }
+          ]
+        },
+        options: { responsive: true, plugins: { legend: { position: 'top' } }, scales: { y: { beginAtZero: false } } }
+      });
+    }
+  }
+
+  // Klik sidebar
+  document.querySelectorAll('.sidebar-nav a[data-page]').forEach(a => {
+    a.addEventListener('click', e => {
+      e.preventDefault();
+      navigate(a.dataset.page);
+    });
+  });
+
+  // Chart tabs riwayat
+  document.querySelectorAll('.chart-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.chart-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+    });
+  });
+
+  // Settings tabs
+  document.querySelectorAll('.settings-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.settings-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+    });
+  });
+
+  // ===== CHART DASHBOARD =====
+  const ctx = document.getElementById('sensorChart').getContext('2d');
+  new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: ['00:00','03:00','06:00','09:00','12:00','15:00','18:00','21:00'],
+      datasets: [
+        { label: 'Suhu (°C)', data: [24,23,25,28,30,31,29,27], borderColor: '#4f46e5', backgroundColor: 'rgba(79,70,229,.08)', tension: 0.4, fill: true },
+        { label: 'Kelembapan (%)', data: [62,64,60,55,52,50,55,60], borderColor: '#06b6d4', backgroundColor: 'rgba(6,182,212,.08)', tension: 0.4, fill: true }
+      ]
+    },
+    options: { responsive: true, plugins: { legend: { position: 'top' } }, scales: { y: { beginAtZero: false } } }
+  });
+</script>
+
 </body>
 </html>
